@@ -1,0 +1,200 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>縣有地租約連動工具</title>
+<style>
+  :root {
+    --bg: #f5f6f8; --card: #fff; --ink: #1f2933; --muted: #616e7c; --line: #d9dee4;
+    --accent: #1d6fb8; --accent-ink: #fff; --ok: #1e7b4a; --warn: #a15c00; --bad: #b42318;
+    --drop: #eef4fb;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--bg); color: var(--ink);
+    font: 16px/1.6 "Microsoft JhengHei", "PingFang TC", "Noto Sans TC", sans-serif;
+  }
+  main { max-width: 860px; margin: 0 auto; padding: 32px 16px 64px; }
+  h1 { font-size: 26px; margin: 0 0 4px; }
+  .lead { color: var(--muted); margin: 0 0 24px; }
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 20px; margin-bottom: 16px; }
+  .step { font-weight: 700; margin: 0 0 12px; }
+  .drops { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  @media (max-width: 640px) { .drops { grid-template-columns: 1fr; } }
+  .drop {
+    border: 2px dashed var(--line); border-radius: 10px; padding: 18px 14px; text-align: center;
+    cursor: pointer; background: var(--drop); transition: border-color .15s; min-height: 120px;
+    display: flex; flex-direction: column; justify-content: center; gap: 4px;
+  }
+  .drop:hover, .drop.over { border-color: var(--accent); }
+  .drop.has { border-style: solid; border-color: var(--ok); background: #eef8f2; }
+  .drop b { font-size: 17px; }
+  .drop .fname { color: var(--muted); font-size: 14px; word-break: break-all; }
+  .drop.has .fname { color: var(--ok); font-weight: 700; }
+  label.opt { display: flex; gap: 10px; align-items: flex-start; margin: 4px 0; cursor: pointer; }
+  label.opt input { margin-top: 6px; width: 18px; height: 18px; }
+  label.opt small { display: block; color: var(--muted); }
+  button {
+    font: inherit; border: 0; border-radius: 8px; padding: 10px 22px; cursor: pointer;
+    background: var(--accent); color: var(--accent-ink); font-weight: 700;
+  }
+  button:disabled { background: #a9b4bf; cursor: not-allowed; }
+  button.ghost { background: transparent; color: var(--accent); border: 1px solid var(--accent); font-weight: 400; padding: 8px 16px; }
+  #log { font-family: Consolas, monospace; font-size: 14px; color: var(--muted); white-space: pre-wrap; margin: 12px 0 0; }
+  #err { color: var(--bad); font-weight: 700; white-space: pre-wrap; }
+  table { width: 100%; border-collapse: collapse; margin: 8px 0 16px; }
+  td { padding: 7px 4px; border-bottom: 1px solid var(--line); }
+  td.n { text-align: right; font-variant-numeric: tabular-nums; font-weight: 700; width: 80px; }
+  .dl { display: flex; flex-direction: column; gap: 8px; }
+  .dl button { text-align: left; }
+  .note { color: var(--muted); font-size: 14px; }
+  .hidden { display: none; }
+  details { margin-top: 8px; }
+  summary { cursor: pointer; color: var(--accent); }
+  details ul { padding-left: 20px; margin: 8px 0; }
+</style>
+</head>
+<body>
+<main>
+  <h1>縣有地租約連動工具</h1>
+  <p class="lead">比對「承租人一覽表」和「縣有農牧用地清冊」，依地號把承租人姓名和租約期間同步到較舊的那一邊。<br>
+    檔案只在這台電腦的瀏覽器裡處理，<b>不會上傳到任何地方</b>，不需要網路。</p>
+
+  <section class="card">
+    <p class="step">1. 選擇兩個 Excel 檔（點一下選檔，或把檔案拖進框裡）</p>
+    <div class="drops">
+      <div class="drop" id="dropTenant" tabindex="0">
+        <b>承租人一覽表</b><span class="fname">尚未選擇</span>
+        <input type="file" accept=".xlsx" hidden>
+      </div>
+      <div class="drop" id="dropRegister" tabindex="0">
+        <b>縣有農牧用地清冊</b><span class="fname">尚未選擇</span>
+        <input type="file" accept=".xlsx" hidden>
+      </div>
+    </div>
+  </section>
+
+  <section class="card">
+    <p class="step">2. 要做什麼</p>
+    <label class="opt"><input type="radio" name="mode" value="check" checked>
+      <span>只比對，產生差異報告<small>先看看兩邊有哪些地方不一樣，不產生修改後的檔案。</small></span></label>
+    <label class="opt"><input type="radio" name="mode" value="sync">
+      <span>比對＋產生同步後的檔案<small>另外產生兩份已更新的 Excel，改過的格子會塗淺紫色底，註解裡有原本的值。原檔不會被修改。</small></span></label>
+    <p style="margin:16px 0 0"><button id="go" disabled>開始</button></p>
+    <div id="log"></div>
+    <div id="err"></div>
+  </section>
+
+  <section class="card hidden" id="result">
+    <p class="step">3. 結果</p>
+    <table id="sum"></table>
+    <div class="dl" id="dl"></div>
+    <p class="note">下載的檔案會存到瀏覽器的「下載」資料夾。如果瀏覽器詢問「是否允許下載多個檔案」，請選允許。</p>
+  </section>
+
+  <section class="card">
+    <details>
+      <summary>判斷規則說明</summary>
+      <ul>
+        <li>用「鄉鎮＋段＋小段＋地號」配對，會自動忽略「市鄉鎮」「段」字尾、地號寫法（1732、1732-0000）和「內」字。</li>
+        <li>比兩邊的<b>到期日</b>，哪邊比較晚就以哪邊為準：承租表較新就更新清冊；清冊較新就回寫承租表的租約期間。</li>
+        <li>清冊較新但承租人換人了，或同一筆地有好幾位承租人時，不會自動回寫，因為承租表的身分證、地址也要一起改。</li>
+        <li>以下情況不會自動改，只列在報告的「③需人工確認」：使用關係是「租用、占用」等混合型、欄位裡有說明文字、註記「到期未續」，或姓名不同但看不出哪邊比較新。</li>
+        <li>建議第一次對齊後，固定以承租人一覽表為主檔，之後每次改完承租表就跑一次。</li>
+      </ul>
+    </details>
+  </section>
+</main>
+
+<script>/*EXCELJS*/</script>
+<script>/*CORE*/</script>
+<script>
+(function () {
+  'use strict';
+  const files = { tenant: null, register: null };
+  const $ = id => document.getElementById(id);
+  const go = $('go');
+
+  function setupDrop(id, slot) {
+    const box = $(id), input = box.querySelector('input'), label = box.querySelector('.fname');
+    const take = f => {
+      if (!f) return;
+      if (!/\.xlsx$/i.test(f.name)) { alert('請選 .xlsx 檔（若是舊的 .xls，請先用 Excel 另存成 .xlsx）'); return; }
+      files[slot] = f;
+      label.textContent = f.name;
+      box.classList.add('has');
+      go.disabled = !(files.tenant && files.register);
+    };
+    box.addEventListener('click', () => input.click());
+    box.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); input.click(); } });
+    input.addEventListener('change', () => take(input.files[0]));
+    box.addEventListener('dragover', e => { e.preventDefault(); box.classList.add('over'); });
+    box.addEventListener('dragleave', () => box.classList.remove('over'));
+    box.addEventListener('drop', e => { e.preventDefault(); box.classList.remove('over'); take(e.dataTransfer.files[0]); });
+  }
+  setupDrop('dropTenant', 'tenant');
+  setupDrop('dropRegister', 'register');
+
+  function download(name, buffer) {
+    const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = name;
+    document.body.appendChild(a);
+    a.click();
+    setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 1000);
+  }
+
+  go.addEventListener('click', async () => {
+    const log = $('log'), err = $('err');
+    log.textContent = ''; err.textContent = '';
+    $('result').classList.add('hidden');
+    go.disabled = true;
+    const say = s => { log.textContent += s + '\n'; };
+    try {
+      const doSync = document.querySelector('input[name=mode]:checked').value === 'sync';
+      const [tb, rb] = await Promise.all([files.tenant.arrayBuffer(), files.register.arrayBuffer()]);
+      // 讓「讀取中」的字先畫出來再開始吃 CPU
+      await new Promise(r => setTimeout(r, 30));
+      const out = await LeaseCore.run(ExcelJS, tb, files.tenant.name, rb, files.register.name, doSync, say);
+      say('產生檔案中…');
+      const sum = $('sum');
+      sum.innerHTML = '';
+      for (const [k, v] of out.summary) {
+        const tr = sum.insertRow();
+        tr.insertCell().textContent = k;
+        const td = tr.insertCell(); td.className = 'n'; td.textContent = v;
+      }
+      const dl = $('dl');
+      dl.innerHTML = '';
+      const ready = [];
+      for (const o of out.outputs) {
+        const buf = await o.workbook.xlsx.writeBuffer();
+        ready.push([o.name, buf]);
+        const b = document.createElement('button');
+        b.className = 'ghost';
+        b.textContent = `下載 ${o.note}：${o.name}`;
+        b.addEventListener('click', () => download(o.name, buf));
+        dl.appendChild(b);
+      }
+      if (ready.length > 1) {
+        const all = document.createElement('button');
+        all.textContent = `全部下載（${ready.length} 個檔案）`;
+        all.addEventListener('click', () => ready.forEach(([n, b], i) => setTimeout(() => download(n, b), i * 400)));
+        dl.prepend(all);
+      }
+      say('完成。');
+      $('result').classList.remove('hidden');
+      $('result').scrollIntoView({ behavior: 'smooth' });
+    } catch (e) {
+      console.error(e);
+      err.textContent = '發生錯誤：' + (e && e.message ? e.message : e);
+    } finally {
+      go.disabled = !(files.tenant && files.register);
+    }
+  });
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,13 @@
+# 真實資料含個資，一律不進版控
+*.xlsx
+*.xls
+*.xlsm
+*.csv
+
+# 建置產物（放 Releases）
+縣有地租約連動工具.html
+*.exe
+build/
+dist/
+*.spec
+__pycache__/
