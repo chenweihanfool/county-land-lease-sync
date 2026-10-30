@@ -6,7 +6,9 @@
 
 ## 下載
 
-到 [Releases](../../releases) 下載 `縣有地租約連動工具.html`。exe 是給 HTML 不能用時的備用版。
+到 [Releases](../../releases) 下載 `lease-sync-tool.html`。exe（`lease-sync-tool.exe`）是給 HTML 不能用時的備用版。
+
+GitHub 不支援中文附件檔名，所以 Releases 用英文檔名；下載後可以自行改名。
 
 ## 使用方式
 
